@@ -284,8 +284,8 @@ TODO modify mnist client to use invidiual number images, seems more exciting tha
 
 ```
 NAMESPACE=tfworkflow
-POD_NAME=$(kubectl get pod -l=app=${JOB_NAME} -n${NAMESPACE} -o jsonpath='{.items[0].metadata.name}')
-kubectl port-forward -n${NAMESPACE} ${POD_NAME} -p 9000:9000
+POD_NAME=$(kubectl get pod -l=app=mnist-${JOB_NAME} -n${NAMESPACE} -o jsonpath='{.items[0].metadata.name}')
+kubectl port-forward -n${NAMESPACE} ${POD_NAME} 9000:9000
 python mnist_client.py  --server 127.0.0.1:9000 --data_dir /tmp/mnistdata
 ```
 

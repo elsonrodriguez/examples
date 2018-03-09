@@ -159,11 +159,8 @@ def main(unused_argv):
     if FLAGS.job_name == "ps":
       print("Running ps.")
       server.join()
-    if FLAGS.job_name == "master":
-      print("Running master.")
-      server.join()
 
-  is_chief = (FLAGS.task_id == 0)
+  is_chief = (FLAGS.task_id == 0) and (FLAGS.job_name == "master")
   if FLAGS.num_gpus > 0:
     # Avoid gpu allocation conflict: now allocate task_num -> #gpu
     # for each worker in the corresponding machine
