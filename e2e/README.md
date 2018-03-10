@@ -176,6 +176,7 @@ cd experimental-kvc
 helm install helm-charts/kube-volume-controller/ -n kvc --wait \
   --set clusterrole.install=true \
   --set storageclass.install=true \
+  --set tag=volumecontroller/v0.2.0-alpha-10-g0dbf295 \
   --set namespace=${NAMESPACE}
 cd ..
 ```
@@ -222,9 +223,11 @@ export S3_ENDPOINT=s3.us-west-2.amazonaws.com
 export S3_DATA_URL=s3://${BUCKET_NAME}/data/mnist/
 export S3_TRAIN_BASE_URL=s3://${BUCKET_NAME}/models
 export JOB_NAME=myjob-$(uuidgen  | cut -c -5 | tr '[:upper:]' '[:lower:]')
-export TF_SERVER_IMAGE=${DOCKER_BASE_URL}/mytfserver:1.0
+export TF_SERVER_IMAGE=${DOCKER_BASE_URL}/mytfmodel:1.0
 export TF_MODEL_IMAGE=${DOCKER_BASE_URL}/mytfmodel:1.0
 export NAMESPACE=tfworkflow
+export TF_WORKER=3
+export MODEL_TRAIN_STEPS=1000
 ```
 
 Next, submit your workflow.
@@ -239,6 +242,8 @@ argo submit model-train.yaml -n ${NAMESPACE} --serviceaccount argo \
     -p s3-data-url=${S3_DATA_URL} \
     -p s3-train-base-url=${S3_TRAIN_BASE_URL} \
     -p job-name=${JOB_NAME} \
+    -p tf-worker=${TF_WORKER} \
+    -p model-train-steps=${MODEL_TRAIN_STEPS} \
     -p namespace=${NAMESPACE}
 ```
 
