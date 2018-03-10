@@ -45,7 +45,6 @@ import os
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 
-
 flags = tf.app.flags
 flags.DEFINE_string("data_dir", "/tmp/mnist-data",
                     "Directory for storing mnist data")
@@ -70,25 +69,25 @@ flags.DEFINE_integer("train_steps", 200,
                      "Number of (global) training steps to perform")
 flags.DEFINE_integer("batch_size", 100, "Training batch size")
 flags.DEFINE_float("learning_rate", 0.01, "Learning rate")
-flags.DEFINE_boolean("sync_replicas", False,
-                     "Use the sync_replicas (synchronized replicas) mode, "
-                     "wherein the parameter updates from workers are aggregated "
-                     "before applied to avoid stale gradients")
+flags.DEFINE_boolean(
+    "sync_replicas", False,
+    "Use the sync_replicas (synchronized replicas) mode, "
+    "wherein the parameter updates from workers are aggregated "
+    "before applied to avoid stale gradients")
 flags.DEFINE_boolean(
     "existing_servers", False, "Whether servers already exists. If True, "
     "will use the worker hosts via their GRPC URLs (one client process "
     "per worker host). Otherwise, will create an in-process TensorFlow "
     "server.")
-flags.DEFINE_string("ps_hosts","localhost:2222",
+flags.DEFINE_string("ps_hosts", "localhost:2222",
                     "Comma-separated list of hostname:port pairs")
 flags.DEFINE_string("worker_hosts", "localhost:2223,localhost:2224",
                     "Comma-separated list of hostname:port pairs")
 flags.DEFINE_string("master_hosts", "localhost:2222",
                     "Comma-separated list of hostname:port pairs")
-flags.DEFINE_string("job_name", None,"job name: worker or ps")
+flags.DEFINE_string("job_name", None, "job name: worker or ps")
 
 FLAGS = flags.FLAGS
-
 
 IMAGE_PIXELS = 28
 
@@ -120,7 +119,6 @@ def mnist_inference(hidden_units):
     cross_entropy = -tf.reduce_sum(y_ * tf.log(tf.clip_by_value(y, 1e-10, 1.0)))
 
     return x, y, y_, cross_entropy
-
 
 def main(unused_argv):
   mnist = input_data.read_data_sets(FLAGS.data_dir, one_hot=True)
@@ -208,6 +206,7 @@ def main(unused_argv):
       sync_init_op = opt.get_init_tokens_op()
 
     init_op = tf.global_variables_initializer()
+
     try:
       os.makedirs(FLAGS.train_dir)
     except OSError:

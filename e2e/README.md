@@ -40,6 +40,7 @@ The stock distributed tensorflow grpc [example](https://github.com/tensorflow/te
 ### Build and push images.
 
 With our code ready, we will now build/push the docker images
+
 ```
 DOCKER_BASE_URL=docker.io/elsonrodriguez # Put your docker registry here
 docker build . --no-cache  -f Dockerfile.tfserver -t ${DOCKER_BASE_URL}/mytfserver:1.0
@@ -97,7 +98,6 @@ We are using the tensorflow operator to automate our distributed training. The e
 Make sure you export your github token first `export GITHUB_TOKEN=xxxxxxxx`
 ```
 NAMESPACE=tfworkflow
-kubectl create namespace ${NAMESPACE}
 APP_NAME=my-kubeflow
 ks init ${APP_NAME}
 cd ${APP_NAME}
@@ -122,7 +122,7 @@ cd -
 Check to ensure things have deployed:
 
 ```
-$ kubectl logs -l name=tf-job-operator -n ${NAMESPACE}
+$ kubectl logs -l name=tf-job-operator
 ...
 I0226 18:25:16.553804       1 leaderelection.go:184] successfully acquired lease default/tf-operator
 I0226 18:25:16.554615       1 controller.go:132] Starting TFJob controller
@@ -141,12 +141,6 @@ Argo is a workflow system used to automate workloads on Kubernetes. The Argo cli
 
 ```
 argo install --install-namespace=${NAMESPACE}
-```
-
-set kubectl context to the new namespace
-
-```
-kubectl config set-context $(kubectl config current-context) --namespace=${NAMESPACE}
 ```
 
 We can check on the status of Argo by checking the logs and listing workflows.
