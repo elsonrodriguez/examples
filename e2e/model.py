@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-
 """Distributed MNIST training and validation, with model replicas.
 
 A simple softmax model with one hidden layer is defined. The parameters
@@ -141,6 +140,7 @@ def main(unused_argv):
 
   # Get the number of workers.
   num_workers = len(worker_spec)
+
   cluster_specc = {"ps": ps_spec, "worker": worker_spec}
   print("cluster_specc = %s" % str(cluster_specc))
   print("num_workers = %d" % num_workers)
@@ -151,7 +151,8 @@ def main(unused_argv):
 
   if not FLAGS.existing_servers:
     # Not using existing servers. Create an in-process server.
-    server = tf.train.Server(cluster, job_name=FLAGS.job_name, task_index=FLAGS.task_id)
+    server = tf.train.Server(
+        cluster, job_name=FLAGS.job_name, task_index=FLAGS.task_id)
     if FLAGS.job_name == "ps":
       print("Running ps.")
       server.join()
@@ -233,7 +234,8 @@ def main(unused_argv):
     sess_config = tf.ConfigProto(
         allow_soft_placement=True,
         log_device_placement=False,
-        device_filters=["/job:ps", "/job:worker/task:%d" % FLAGS.task_id])
+        device_filters=["/job:ps",
+                        "/job:worker/task:%d" % FLAGS.task_id])
 
     # The chief worker (task_id==0) session will prepare the session,
     # while the remaining workers will wait for the preparation to complete.
@@ -247,8 +249,7 @@ def main(unused_argv):
       server_grpc_url = "grpc://" + worker_spec[FLAGS.task_id]
       print("Using existing server at: %s" % server_grpc_url)
 
-      sess = sv.prepare_or_wait_for_session(server_grpc_url,
-                                            config=sess_config)
+      sess = sv.prepare_or_wait_for_session(server_grpc_url, config=sess_config)
     else:
       sess = sv.prepare_or_wait_for_session(server.target, config=sess_config)
 
@@ -280,7 +281,6 @@ def main(unused_argv):
 
       if step >= FLAGS.train_steps:
         break
-
     saver.save(sess, FLAGS.train_dir)
     time_end = time.time()
     print("Training ends @ %f" % time_end)
