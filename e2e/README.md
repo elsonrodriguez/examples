@@ -228,8 +228,9 @@ export TF_SERVER_IMAGE=${DOCKER_BASE_URL}/mytfmodel:1.0
 export TF_MODEL_IMAGE=${DOCKER_BASE_URL}/mytfmodel:1.0
 export NAMESPACE=tfworkflow
 export TF_WORKER=3
-export MODEL_TRAIN_STEPS=1000
+export MODEL_TRAIN_STEPS=200
 ```
+TODO: figure out why master crashes when steps are higher than 200. Might be related to train.Supervisor. Maybe.
 
 Next, submit your workflow.
 
