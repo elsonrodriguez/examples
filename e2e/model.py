@@ -144,10 +144,7 @@ def main(unused_argv):
   cluster_specc = {"ps": ps_spec, "worker": worker_spec}
   print("cluster_specc = %s" % str(cluster_specc))
   print("num_workers = %d" % num_workers)
-  cluster = tf.train.ClusterSpec({
-      "master": master_spec,
-      "ps": ps_spec,
-      "worker": worker_spec})
+  cluster = tf.train.ClusterSpec({"master": master_spec, "ps": ps_spec, "worker": worker_spec})
 
   if not FLAGS.existing_servers:
     # Not using existing servers. Create an in-process server.
