@@ -120,7 +120,7 @@ In the following instructions we will install our required components to a singl
 
 We are using the tensorflow operator to automate our distributed training. The easiest way to install the operator is by using ksonnet:
 
-Make sure you export your github token first `export GITHUB_TOKEN=xxxxxxxx`. And since you will need admin status for the final `ks apply` command, make sure you are an admin of the cluster `kubectl config set-credentials ...`, `kubectl config set-context ...` then `kubectl config use-context ...`.
+Make sure you export your github token first `export GITHUB_TOKEN=xxxxxxxx`. And since you will need admin status for the final `ks apply` command, make sure you are an admin of the cluster `kubectl config set-credentials <username> --username=<admin_username> --password=<admin_password>`, `kubectl config set-context <context_name> --cluster=<cluster_name> --user=<username> --namespace=<namespace>,` then `kubectl config use-context <context_name>`.
 ```
 NAMESPACE=tfworkflow
 APP_NAME=my-kubeflow
