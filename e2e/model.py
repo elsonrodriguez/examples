@@ -23,7 +23,17 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
+import os
+import sys
 
+# Configure model options
+TF_DATA_DIR = os.getenv("TF_DATA_DIR", "/tmp/data/")
+TF_MODEL_DIR = os.getenv("TF_MODEL_DIR", None)
+TF_EXPORT_DIR = os.getenv("TF_EXPORT_DIR", "/tmp/export/")
+TF_MODEL_TYPE = os.getenv("TF_MODEL_TYPE", "CNN")
+TF_TRAIN_STEPS = int(os.getenv("TF_TRAIN_STEPS", 200))
+TF_BATCH_SIZE = int(os.getenv("TF_BATCH_SIZE", 100))
+TF_LEARNING_RATE = float(os.getenv("TF_LEARNING_RATE", 0.01 ))
 
 N_DIGITS = 10  # Number of digits.
 X_FEATURE = 'x'  # Name of the input feature.
@@ -83,7 +93,7 @@ def conv_model(features, labels, mode):
 
   # Create training op.
   if mode == tf.estimator.ModeKeys.TRAIN:
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=TF_LEARNING_RATE)
     train_op = optimizer.minimize(loss, global_step=tf.train.get_global_step())
     return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
 
@@ -100,11 +110,11 @@ def main(unused_args):
   tf.logging.set_verbosity(tf.logging.INFO)
 
   ### Download and load MNIST dataset.
-  mnist = tf.contrib.learn.datasets.DATASETS['mnist']('/tmp/mnist')
+  mnist = tf.contrib.learn.datasets.DATASETS['mnist'](TF_DATA_DIR)
   train_input_fn = tf.estimator.inputs.numpy_input_fn(
       x={X_FEATURE: mnist.train.images},
       y=mnist.train.labels.astype(np.int32),
-      batch_size=100,
+      batch_size=TF_BATCH_SIZE,
       num_epochs=None,
       shuffle=True)
   test_input_fn = tf.estimator.inputs.numpy_input_fn(
@@ -113,23 +123,29 @@ def main(unused_args):
       num_epochs=1,
       shuffle=False)
 
-  ### Linear classifier.
-  feature_columns = [
-      tf.feature_column.numeric_column(
-          X_FEATURE, shape=mnist.train.images.shape[1:])]
+  if TF_MODEL_TYPE == "LINEAR":
+    ### Linear classifier.
+    feature_columns = [
+        tf.feature_column.numeric_column(
+            X_FEATURE, shape=mnist.train.images.shape[1:])]
 
-  classifier = tf.estimator.LinearClassifier(
-      feature_columns=feature_columns, n_classes=N_DIGITS)
-  classifier.train(input_fn=train_input_fn, steps=200)
-  scores = classifier.evaluate(input_fn=test_input_fn)
-  print('Accuracy (LinearClassifier): {0:f}'.format(scores['accuracy']))
+    classifier = tf.estimator.LinearClassifier(
+        feature_columns=feature_columns, n_classes=N_DIGITS, model_dir=TF_MODEL_DIR)
+    classifier.train(input_fn=train_input_fn, steps=TF_TRAIN_STEPS)
+    scores = classifier.evaluate(input_fn=test_input_fn)
+    print('Accuracy (LinearClassifier): {0:f}'.format(scores['accuracy']))
+  elif TF_MODEL_TYPE == "CNN":
+    ### Convolutional network
+    classifier = tf.estimator.Estimator(model_fn=conv_model, model_dir=TF_MODEL_DIR)
+    classifier.train(input_fn=train_input_fn, steps=TF_TRAIN_STEPS)
+    scores = classifier.evaluate(input_fn=test_input_fn)
+    print('Accuracy (conv_model): {0:f}'.format(scores['accuracy']))
+  else:
+    print("No such model type: %s" % TF_MODEL_TYPE)
+    sys.exit(1)
 
-  ### Convolutional network
-  classifier = tf.estimator.Estimator(model_fn=conv_model)
-  classifier.train(input_fn=train_input_fn, steps=200)
-  scores = classifier.evaluate(input_fn=test_input_fn)
-  print('Accuracy (conv_model): {0:f}'.format(scores['accuracy']))
-
+# classifier.export_savedmodel("/tmp/newmodelexport", classifier)
+#  tf.estimator.Estimator.export_savedmodel("/tmp/newmodelexport/", classifier)
 
 if __name__ == '__main__':
   tf.app.run()
