@@ -78,6 +78,8 @@ def conv_model(features, labels, mode):
 
   # Compute logits (1 per class) and compute loss.
   logits = tf.layers.dense(h_fc1, N_DIGITS, activation=None)
+  predict = tf.nn.softmax(logits)
+  classes = tf.cast(tf.argmax(predict, 1), tf.uint8)
 
   # Compute predictions.
   predicted_classes = tf.argmax(logits, 1)
@@ -86,7 +88,7 @@ def conv_model(features, labels, mode):
         'class': predicted_classes,
         'prob': tf.nn.softmax(logits)
     }
-    return tf.estimator.EstimatorSpec(mode, predictions=predictions)
+    return tf.estimator.EstimatorSpec(mode, predictions=predictions, export_outputs={'classes': tf.estimator.export.PredictOutput({"predictions": predict, "classes": classes})})
 
   # Compute loss.
   loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
@@ -104,6 +106,10 @@ def conv_model(features, labels, mode):
   }
   return tf.estimator.EstimatorSpec(
       mode, loss=loss, eval_metric_ops=eval_metric_ops)
+
+def serving_input_receiver_fn():
+  inputs = {X_FEATURE: tf.placeholder(tf.float32, [None, 28, 28])}
+  return tf.estimator.export.ServingInputReceiver(inputs, inputs)
 
 
 def main(unused_args):
@@ -140,12 +146,11 @@ def main(unused_args):
     classifier.train(input_fn=train_input_fn, steps=TF_TRAIN_STEPS)
     scores = classifier.evaluate(input_fn=test_input_fn)
     print('Accuracy (conv_model): {0:f}'.format(scores['accuracy']))
+    classifier.export_savedmodel(TF_EXPORT_DIR, serving_input_receiver_fn)
   else:
     print("No such model type: %s" % TF_MODEL_TYPE)
     sys.exit(1)
 
-# classifier.export_savedmodel("/tmp/newmodelexport", classifier)
-#  tf.estimator.Estimator.export_savedmodel("/tmp/newmodelexport/", classifier)
 
 if __name__ == '__main__':
   tf.app.run()
