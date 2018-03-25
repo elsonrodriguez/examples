@@ -107,8 +107,12 @@ def conv_model(features, labels, mode):
   return tf.estimator.EstimatorSpec(
       mode, loss=loss, eval_metric_ops=eval_metric_ops)
 
-def serving_input_receiver_fn():
+def cnn_serving_input_receiver_fn():
   inputs = {X_FEATURE: tf.placeholder(tf.float32, [None, 28, 28])}
+  return tf.estimator.export.ServingInputReceiver(inputs, inputs)
+
+def linear_serving_input_receiver_fn():
+  inputs = {X_FEATURE: tf.placeholder(tf.float32, (784,))}
   return tf.estimator.export.ServingInputReceiver(inputs, inputs)
 
 
@@ -140,13 +144,15 @@ def main(unused_args):
     classifier.train(input_fn=train_input_fn, steps=TF_TRAIN_STEPS)
     scores = classifier.evaluate(input_fn=test_input_fn)
     print('Accuracy (LinearClassifier): {0:f}'.format(scores['accuracy']))
+    #FIXME This doesn't seem to work. sticking to CNN for the example.
+    classifier.export_savedmodel(TF_EXPORT_DIR, linear_serving_input_receiver_fn)
   elif TF_MODEL_TYPE == "CNN":
     ### Convolutional network
     classifier = tf.estimator.Estimator(model_fn=conv_model, model_dir=TF_MODEL_DIR)
     classifier.train(input_fn=train_input_fn, steps=TF_TRAIN_STEPS)
     scores = classifier.evaluate(input_fn=test_input_fn)
     print('Accuracy (conv_model): {0:f}'.format(scores['accuracy']))
-    classifier.export_savedmodel(TF_EXPORT_DIR, serving_input_receiver_fn)
+    classifier.export_savedmodel(TF_EXPORT_DIR, cnn_serving_input_receiver_fn)
   else:
     print("No such model type: %s" % TF_MODEL_TYPE)
     sys.exit(1)
