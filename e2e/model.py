@@ -144,7 +144,7 @@ def main(unused_args):
     classifier.train(input_fn=train_input_fn, steps=TF_TRAIN_STEPS)
     scores = classifier.evaluate(input_fn=test_input_fn)
     print('Accuracy (LinearClassifier): {0:f}'.format(scores['accuracy']))
-    #FIXME This doesn't seem to work. sticking to CNN for the example.
+    #FIXME This doesn't seem to work. sticking to CNN for the example for now.
     classifier.export_savedmodel(TF_EXPORT_DIR, linear_serving_input_receiver_fn)
   elif TF_MODEL_TYPE == "CNN":
     ### Convolutional network
