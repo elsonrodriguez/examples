@@ -149,10 +149,11 @@ def main(unused_args):
   elif TF_MODEL_TYPE == "CNN":
     ### Convolutional network
     classifier = tf.estimator.Estimator(model_fn=conv_model, model_dir=TF_MODEL_DIR)
-    classifier.train(input_fn=train_input_fn, steps=TF_TRAIN_STEPS)
-    scores = classifier.evaluate(input_fn=test_input_fn)
-    print('Accuracy (conv_model): {0:f}'.format(scores['accuracy']))
-    classifier.export_savedmodel(TF_EXPORT_DIR, cnn_serving_input_receiver_fn)
+    export_latest = tf.estimator.LatestExporter(TF_EXPORT_DIR, serving_input_receiver_fn=cnn_serving_input_receiver_fn)
+    train_spec = tf.estimator.TrainSpec(input_fn=lambda: train_input_fn(), max_steps=TF_TRAIN_STEPS)
+    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: test_input_fn(), steps=1, exporters=export_latest, throttle_secs=1,
+                                      start_delay_secs=1)
+    tf.estimator.train_and_evaluate(classifier, train_spec, eval_spec)
   else:
     print("No such model type: %s" % TF_MODEL_TYPE)
     sys.exit(1)
