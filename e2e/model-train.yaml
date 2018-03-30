@@ -71,8 +71,8 @@ spec:
           template: tf-tensorboard
           arguments:
             parameters:
-            - name: s3-unfinished-url
-              value: "{{steps.get-workflow-info.outputs.parameters.s3-unfinished-url}}"
+            - name: s3-model-url
+              value: "{{steps.get-workflow-info.outputs.parameters.s3-model-url}}"
       - - name: train-model
           template: tf-train
           arguments:
@@ -81,10 +81,8 @@ spec:
               value: "{{steps.get-workflow-info.outputs.parameters.nodeaffinity}}"
             - name: hostpath
               value: "{{steps.get-workflow-info.outputs.parameters.hostpath}}"
-            - name: s3-unfinished-url
-              value: "{{steps.get-workflow-info.outputs.parameters.s3-unfinished-url}}"
-            - name: s3-exported-url
-              value: "{{steps.get-workflow-info.outputs.parameters.s3-exported-url}}"
+            - name: s3-model-url
+              value: "{{steps.get-workflow-info.outputs.parameters.s3-model-url}}"
       - - name: serve-model
           template: tf-inference
           arguments:
@@ -123,7 +121,7 @@ spec:
     container:
       image: nervana/circleci:master
       imagePullPolicy: Always
-      command: ["bash", "-c", "kubectl get volumemanager mnist -o json | jq -r '.status.volumes[].volumeSource.hostPath.path' | tee /tmp/hostpath; kubectl get volumemanager mnist -o json | jq '.status.volumes[].nodeAffinity' | tee /tmp/nodeaffinity; echo '{{workflow.parameters.s3-train-base-url}}/unfinished/{{workflow.parameters.job-name}}/' | tr -d '[:space:]' > /tmp/s3-unfinished-url; echo '{{workflow.parameters.s3-train-base-url}}/exported/{{workflow.parameters.job-name}}/' | tr -d '[:space:]' > /tmp/s3-exported-url"]
+      command: ["bash", "-c", "kubectl get volumemanager mnist -o json | jq -r '.status.volumes[].volumeSource.hostPath.path' | tee /tmp/hostpath; kubectl get volumemanager mnist -o json | jq '.status.volumes[].nodeAffinity' | tee /tmp/nodeaffinity; echo '{{workflow.parameters.s3-train-base-url}}/{{workflow.parameters.job-name}}/' | tr -d '[:space:]' > /tmp/s3-model-url; echo '{{workflow.parameters.s3-train-base-url}}/{{workflow.parameters.job-name}}/export/{{workflow.parameters.model-name}}/' | tr -d '[:space:]' > /tmp/s3-exported-url"]
     outputs:
       parameters:
       - name: hostpath
@@ -132,9 +130,9 @@ spec:
       - name: nodeaffinity
         valueFrom:
           path: /tmp/nodeaffinity
-      - name: s3-unfinished-url
+      - name: s3-model-url
         valueFrom:
-          path: /tmp/s3-unfinished-url
+          path: /tmp/s3-model-url
       - name: s3-exported-url
         valueFrom:
           path: /tmp/s3-exported-url
@@ -143,8 +141,7 @@ spec:
       parameters:
       - name: nodeaffinity
       - name: hostpath
-      - name: s3-unfinished-url
-      - name: s3-exported-url
+      - name: s3-model-url
     resource:
       action: apply
       # NOTE: need to detect master node complete
@@ -174,9 +171,9 @@ spec:
                       mountPath: /tmp/data
                     env:
                     - name: TF_MODEL_DIR
-                      value: {{inputs.parameters.s3-unfinished-url}}
+                      value: {{inputs.parameters.s3-model-url}}
                     - name: TF_EXPORT_DIR
-                      value: {{inputs.parameters.s3-exported-url}}
+                      value: {{workflow.parameters.model-name}}
                     - name: TF_TRAIN_STEPS
                       value: "{{workflow.parameters.model-train-steps}}"
                     - name: TF_TF_BATCH_SIZE
@@ -227,9 +224,9 @@ spec:
                       mountPath: /tmp/data
                     env:
                     - name: TF_MODEL_DIR
-                      value: {{inputs.parameters.s3-unfinished-url}}
+                      value: {{inputs.parameters.s3-model-url}}
                     - name: TF_EXPORT_DIR
-                      value: {{inputs.parameters.s3-exported-url}}
+                      value: {{workflow.parameters.model-name}}
                     - name: TF_TRAIN_STEPS
                       value: "{{workflow.parameters.model-train-steps}}"
                     - name: TF_TF_BATCH_SIZE
@@ -273,9 +270,9 @@ spec:
                     imagePullPolicy: Always
                     env:
                     - name: TF_MODEL_DIR
-                      value: {{inputs.parameters.s3-unfinished-url}}
+                      value: {{inputs.parameters.s3-model-url}}
                     - name: TF_EXPORT_DIR
-                      value: {{inputs.parameters.s3-exported-url}}
+                      value: {{workflow.parameters.model-name}}
                     - name: TF_TRAIN_STEPS
                       value: "{{workflow.parameters.model-train-steps}}"
                     - name: TF_TF_BATCH_SIZE
@@ -312,7 +309,7 @@ spec:
   - name: tf-tensorboard
     inputs:
       parameters:
-      - name: s3-unfinished-url
+      - name: s3-model-url
     resource:
       action: apply
       manifest: |
@@ -341,7 +338,7 @@ spec:
                  - /usr/local/bin/tensorboard
                 args:
                 - --logdir
-                - {{inputs.parameters.s3-unfinished-url}}
+                - {{inputs.parameters.s3-model-url}}
                 env:
                 - name: AWS_ACCESS_KEY_ID
                   valueFrom:
@@ -423,4 +420,4 @@ spec:
     container:
       image: nervana/circleci:master
       imagePullPolicy: Always
-      command: ["bash", "-c", "kubectl delete tfjob {{workflow.parameters.job-name}} || true; kubectl delete pod exporter-{{workflow.parameters.job-name}} || true"]
+      command: ["bash", "-c", "kubectl delete tfjob {{workflow.parameters.job-name}} || true"]

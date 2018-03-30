@@ -29,7 +29,7 @@ import sys
 # Configure model options
 TF_DATA_DIR = os.getenv("TF_DATA_DIR", "/tmp/data/")
 TF_MODEL_DIR = os.getenv("TF_MODEL_DIR", None)
-TF_EXPORT_DIR = os.getenv("TF_EXPORT_DIR", "/tmp/export/")
+TF_EXPORT_DIR = os.getenv("TF_EXPORT_DIR", "mnist/")
 TF_MODEL_TYPE = os.getenv("TF_MODEL_TYPE", "CNN")
 TF_TRAIN_STEPS = int(os.getenv("TF_TRAIN_STEPS", 200))
 TF_BATCH_SIZE = int(os.getenv("TF_BATCH_SIZE", 100))
@@ -148,10 +148,11 @@ def main(unused_args):
     classifier.export_savedmodel(TF_EXPORT_DIR, linear_serving_input_receiver_fn)
   elif TF_MODEL_TYPE == "CNN":
     ### Convolutional network
-    classifier = tf.estimator.Estimator(model_fn=conv_model, model_dir=TF_MODEL_DIR)
-    export_latest = tf.estimator.LatestExporter(TF_EXPORT_DIR, serving_input_receiver_fn=cnn_serving_input_receiver_fn)
+    training_config = tf.estimator.RunConfig(model_dir=TF_MODEL_DIR, save_summary_steps=100, save_checkpoints_steps=1000)
+    classifier = tf.estimator.Estimator(model_fn=conv_model, model_dir=TF_MODEL_DIR, config=training_config)
+    export_final = tf.estimator.FinalExporter(TF_EXPORT_DIR, serving_input_receiver_fn=cnn_serving_input_receiver_fn)
     train_spec = tf.estimator.TrainSpec(input_fn=lambda: train_input_fn(), max_steps=TF_TRAIN_STEPS)
-    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: test_input_fn(), steps=1, exporters=export_latest, throttle_secs=1,
+    eval_spec = tf.estimator.EvalSpec(input_fn=lambda: test_input_fn(), steps=1, exporters=export_final, throttle_secs=1,
                                       start_delay_secs=1)
     tf.estimator.train_and_evaluate(classifier, train_spec, eval_spec)
   else:

@@ -45,7 +45,7 @@ tf.app.flags.DEFINE_string("data_dir", "/tmp/mnist-data",
 tf.app.flags.DEFINE_integer('concurrency', 1,
                             'maximum number of concurrent inference requests')
 tf.app.flags.DEFINE_integer('num_tests', 100, 'Number of test images')
-tf.app.flags.DEFINE_string('server', '', 'PredictionService host:port')
+tf.app.flags.DEFINE_string('server', '127.0.0.1:9000', 'PredictionService host:port')
 tf.app.flags.DEFINE_string('model_name', 'mnist', 'name of the model in the servable bundle, TEMPORARY HACK')
 FLAGS = tf.app.flags.FLAGS
 
@@ -147,10 +147,10 @@ def do_inference(hostport, data_dir, concurrency, num_tests):
     result_counter = _ResultCounter(num_tests, concurrency)
     for _ in range(num_tests):
         request = predict_pb2.PredictRequest()
-        request.model_spec.name = FLAGS.model_name 
-        request.model_spec.signature_name = 'predict_images'
+        request.model_spec.name = FLAGS.model_name
+        request.model_spec.signature_name = "serving_default"
         image, label = test_data_set.next_batch(1)
-        request.inputs['images'].CopyFrom(
+        request.inputs['x'].CopyFrom(
             tf.contrib.util.make_tensor_proto(image[0], shape=[1, image[0].size]))
         result_counter.throttle()
         result_future = stub.Predict.future(request, 5.0)  # 5 seconds
