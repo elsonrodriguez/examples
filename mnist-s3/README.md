@@ -1,6 +1,6 @@
-# Kubeflow End to End
+# Training MNIST using Kubeflow, S3, and Argo.
 
-This example guides you through the process of taking an example model, modifying it to run better within kubeflow, providing data to your model, and serving the resulting trained model. We will be using Argo to manage the workflow, Kube Volume Controller to locally cache data from S3, Tensorflow's S3 support for saving model training info, Tensorboard to visualize the training, and Kubeflow to serve the model.
+This example guides you through the process of taking an example model, modifying it to run better within kubeflow, and serving the resulting trained model. We will be using Argo to manage the workflow, Tensorflow's S3 support for saving model training info, Tensorboard to visualize the training, and Kubeflow to serve the model.
 
 ## Prerequisites
 
@@ -10,7 +10,7 @@ Before we get started there a few requirements.
 
 Your cluster must:
 
-- Be at least version 1.9 with VolumeScheduling feature gate enabled
+- Be at least version 1.9
 - Have access to an S3-compatible object store ([Amazon S3](https://aws.amazon.com/s3/), [Google Storage](https://cloud.google.com/storage/docs/interoperability), [Minio](https://www.minio.io/kubernetes.html))
 - Contain 3 nodes of at least 8 cores and 16 GB of RAM.
 
@@ -35,7 +35,6 @@ You also need the following command line tools:
 
 - [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 - [argo](https://github.com/argoproj/argo/blob/master/demo.md#1-download-argo)
-- [helm](https://docs.helm.sh/using_helm/#installing-helm)
 - [ksonnet](https://ksonnet.io/#get-started)
 - [aws](https://docs.aws.amazon.com/cli/latest/userguide/installing.html)
 - [minio client](https://github.com/minio/mc#macos)
@@ -54,7 +53,7 @@ export GITHUB_TOKEN=xxxxxxxx
 
 ## Modifying existing examples
 
-Many examples online use containers with pre-canned data, or scripts with certain assumptions as to the cluster spec. We will modify one of these [examples](https://github.com/tensorflow/tensorflow/blob/9a24e8acfcd8c9046e1abaac9dbf5e146186f4c2/tensorflow/examples/learn/mnist.py) to be better suited for distributed training and model serving.
+Many examples online use models that are unconfigurable, or don't work well in distributed mode. We will modify one of these [examples](https://github.com/tensorflow/tensorflow/blob/9a24e8acfcd8c9046e1abaac9dbf5e146186f4c2/tensorflow/examples/learn/mnist.py) to be better suited for distributed training and model serving.
 
 ### Prepare model
 
@@ -79,44 +78,9 @@ docker build . --no-cache  -f Dockerfile.model -t ${DOCKER_BASE_URL}/mytfmodel:1
 docker push ${DOCKER_BASE_URL}/mytfmodel:1.0
 ```
 
-## Upload data
-
-First, we need to grab the mnist training data set:
-
-```
-mkdir -p /tmp/mnistdata
-cd /tmp/mnistdata
-
-curl -O https://storage.googleapis.com/cvdf-datasets/mnist/train-images-idx3-ubyte.gz
-curl -O https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz
-curl -O https://storage.googleapis.com/cvdf-datasets/mnist/t10k-images-idx3-ubyte.gz
-curl -O https://storage.googleapis.com/cvdf-datasets/mnist/t10k-labels-idx1-ubyte.gz
-cd -
-```
-
-Next create a bucket or path in your S3-compatible object store.
-
-```
-#Note if not using AWS S3, you must specify --endpoint-url for all these commands.
-export S3_ENDPOINT=s3.us-west-2.amazonaws.com
-export AWS_ENDPOINT_URL=https://${S3_ENDPOINT}
-export AWS_ACCESS_KEY_ID=xxxxx
-export AWS_SECRET_ACCESS_KEY=xxxxx
-export BUCKET_NAME=mybucket
-
-aws s3api create-bucket --bucket=${BUCKET_NAME}
-```
-
-Now upload your training data
-
-```
-mc config host add s3 ${AWS_ENDPOINT_URL} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY}
-mc mirror /tmp/mnistdata/ s3/${BUCKET_NAME}/data/mnist/
-```
-
 ## Preparing your Kubernetes Cluster
 
-With our data and workloads ready, now the cluster must be prepared. We will be deploying the TF Operator, Argo, and Kubernetes Volume Manager to help manage our training job.
+With our data and workloads ready, now the cluster must be prepared. We will be deploying the TF Operator, and Argo to help manage our training job.
 
 In the following instructions we will install our required components to a single namespace.  For these instructions we will assume the chosen namespace is `tfworkflow`:
 
@@ -181,37 +145,16 @@ $ argo list
 NAME   STATUS   AGE   DURATION
 ```
 
-### Deploying Kube Volume Controller
-
-Kube Volume Controller is a utility that can seed replicas of datasets across nodes. Think of it as an explicit caching mechanism. In the initial run, KVC downloads the mnist dataset, then in subsquent runs the data is reused, bypassing the download step, and making data available on the local disk.
-
-First we need to install tiller on the cluster with rbac under the kube-system namespace. Instructions can be found [here](https://github.com/kubernetes/helm/blob/ae878f91c36b491b92f046de74784cb462f67419/docs/rbac.md#example-service-account-with-cluster-admin-role) in the section "Example: Service account with cluster-admin role".
-
-Then install Kube Volume Controller:
-```
-git clone https://github.com/kubeflow/experimental-kvc.git
-cd experimental-kvc
-git checkout 6a23964
-helm install helm-charts/kube-volume-controller/ -n kvc --wait \
-  --set clusterrole.install=true \
-  --set storageclass.install=true \
-  --set tag=6a23964 \
-  --set namespace=${NAMESPACE}
-cd ..
-```
-
-We can check on the status of kube-volume-controller:
-```
-$ kubectl get pod -l=app=kvc
-NAME                   READY     STATUS    RESTARTS   AGE
-kvc-765bf7f8f7-r9nmb   1/1       Running   0          40s
-$ kubectl get crd | grep volumemanagers
-volumemanagers.kvc.kubeflow.org   1m
-```
-
 ### Creating secrets for our workflow
 For fetching and uploading data, our workflow requires S3 credentials. These credentials will be provided as kubernetes secrets:
+
 ```
+export S3_ENDPOINT=s3.us-west-2.amazonaws.com
+export AWS_ENDPOINT_URL=https://${S3_ENDPOINT}
+export AWS_ACCESS_KEY_ID=xxxxx
+export AWS_SECRET_ACCESS_KEY=xxxxx
+export BUCKET_NAME=mybucket
+
 kubectl create secret generic aws-creds --from-literal=awsAccessKeyID=${AWS_ACCESS_KEY_ID} \
  --from-literal=awsSecretAccessKey=${AWS_SECRET_ACCESS_KEY}
 ```
@@ -220,16 +163,14 @@ kubectl create secret generic aws-creds --from-literal=awsAccessKeyID=${AWS_ACCE
 
 This is the bulk of the work, let's walk through what is needed:
 
-1. Download our datasets
-2. Train the model
-3. Export the model
-4. Serve the model
+1. Train the model
+1. Export the model
+1. Serve the model
 
 Now let's look at how this is represented in our [example workflow](model-train.yaml)
 
 The argo workflow can be daunting, but basically our steps above extrapolate as follows:
 
-1. `download-dataset`: Create a `volumemanager` k8s object which is handled by Kube Volume Controller. This will download data to nodes, which can be re-used for subsequent runs to save on download time.
 1. `get-workflow-info`: Generate and set variables for consumption in the rest of the pipeline.
 1. `tensorboard`: Tensorboard is spawned, configured to watch the S3 URL for the training output.
 1. `train-model`: A TFJob is spawned taking in variables such as number of workers, what path the datasets are at, which model container image, etc.
@@ -282,14 +223,7 @@ $ argo get tf-workflow-h7hwh
 
 ## Monitoring
 
-There are various ways to monitor workflow/training job. In addition to using `kubectl` to query for the status of `pods`, you can see the status of the mnist data volume:
-
-```
-kubectl describe volumemanager mnist
-
-```
-
-Some basic dashboards are also available.
+There are various ways to monitor workflow/training job. In addition to using `kubectl` to query for the status of `pods`, some basic dashboards are also available.
 
 ### Argo UI
 
@@ -424,12 +358,6 @@ argo submit model-train.yaml -n ${NAMESPACE} --serviceaccount argo \
     -p tf-worker=${TF_WORKER} \
     -p model-train-steps=${MODEL_TRAIN_STEPS} \
     -p namespace=${NAMESPACE}
-```
-
-If you want to test changes to the `volumemanager` object, or want to force a re-download of data, you must delete the existing one:
-
-```
-kubectl delete volumemanager mnist
 ```
 
 ## Next Steps

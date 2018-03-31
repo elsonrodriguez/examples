@@ -63,8 +63,6 @@ spec:
   templates:
   - name: tests
     steps:
-      - - name: download-dataset
-          template: kvc
       - - name: get-workflow-info
           template: get-workflow-info
       - - name: tensorboard
@@ -77,10 +75,6 @@ spec:
           template: tf-train
           arguments:
             parameters:
-            - name: nodeaffinity
-              value: "{{steps.get-workflow-info.outputs.parameters.nodeaffinity}}"
-            - name: hostpath
-              value: "{{steps.get-workflow-info.outputs.parameters.hostpath}}"
             - name: s3-model-url
               value: "{{steps.get-workflow-info.outputs.parameters.s3-model-url}}"
       - - name: serve-model
@@ -94,42 +88,13 @@ spec:
     steps:
       - - name: cleanup
           template: clean
-  - name: kvc
-    resource:
-      action: apply
-      successCondition: status.state == Running
-      manifest: |
-        apiVersion: kvc.kubeflow.org/v1
-        kind: VolumeManager
-        metadata:
-          name: mnist
-          namespace: {{workflow.parameters.namespace}}
-        spec:
-          volumeConfigs:
-            - id: "mnist-{{workflow.uid}}"
-              replicas: {{workflow.parameters.tf-worker}}
-              sourceType: "S3"
-              sourceURL: "{{workflow.parameters.s3-data-url}}"
-              AccessMode: "ReadWriteOnce"
-              endpointURL: "{{workflow.parameters.aws-endpoint-url}}"
-              Capacity: 1Gi
-              Labels:
-                tfdata: mnist
-              Options:
-                awsCredentialsSecretName: {{workflow.parameters.aws-secret}}
   - name: get-workflow-info
     container:
       image: nervana/circleci:master
       imagePullPolicy: Always
-      command: ["bash", "-c", "kubectl get volumemanager mnist -o json | jq -r '.status.volumes[].volumeSource.hostPath.path' | tee /tmp/hostpath; kubectl get volumemanager mnist -o json | jq '.status.volumes[].nodeAffinity' | tee /tmp/nodeaffinity; echo '{{workflow.parameters.s3-train-base-url}}/{{workflow.parameters.job-name}}/' | tr -d '[:space:]' > /tmp/s3-model-url; echo '{{workflow.parameters.s3-train-base-url}}/{{workflow.parameters.job-name}}/export/{{workflow.parameters.model-name}}/' | tr -d '[:space:]' > /tmp/s3-exported-url"]
+      command: ["bash", "-c", "echo '{{workflow.parameters.s3-train-base-url}}/{{workflow.parameters.job-name}}/' | tr -d '[:space:]' > /tmp/s3-model-url; echo '{{workflow.parameters.s3-train-base-url}}/{{workflow.parameters.job-name}}/export/{{workflow.parameters.model-name}}/' | tr -d '[:space:]' > /tmp/s3-exported-url"]
     outputs:
       parameters:
-      - name: hostpath
-        valueFrom:
-          path: /tmp/hostpath
-      - name: nodeaffinity
-        valueFrom:
-          path: /tmp/nodeaffinity
       - name: s3-model-url
         valueFrom:
           path: /tmp/s3-model-url
@@ -139,8 +104,6 @@ spec:
   - name: tf-train
     inputs:
       parameters:
-      - name: nodeaffinity
-      - name: hostpath
       - name: s3-model-url
     resource:
       action: apply
@@ -158,17 +121,11 @@ spec:
             tfReplicaType: MASTER
             template:
               spec:
-                affinity:
-                  nodeAffinity:
-                    {{inputs.parameters.nodeaffinity}}
                 serviceAccountName: tf-job-operator
                 containers:
                   - image: {{workflow.parameters.tf-model-image}}
                     name: tensorflow
                     imagePullPolicy: Always
-                    volumeMounts:
-                    - name: training-data
-                      mountPath: /tmp/data
                     env:
                     - name: TF_MODEL_DIR
                       value: {{inputs.parameters.s3-model-url}}
@@ -202,26 +159,16 @@ spec:
                       value: "true"
                     - name: S3_ENDPOINT
                       value: {{workflow.parameters.s3-endpoint}}
-                volumes:
-                - name: training-data
-                  hostPath:
-                    path: {{inputs.parameters.hostpath}}
                 restartPolicy: OnFailure
           - replicas: {{workflow.parameters.tf-worker}}
             tfReplicaType: WORKER
             template:
               spec:
-                affinity:
-                  nodeAffinity:
-                    {{inputs.parameters.nodeaffinity}}
                 serviceAccountName: tf-job-operator
                 containers:
                   - image: {{workflow.parameters.tf-model-image}}
                     name: tensorflow
                     imagePullPolicy: Always
-                    volumeMounts:
-                    - name: training-data
-                      mountPath: /tmp/data
                     env:
                     - name: TF_MODEL_DIR
                       value: {{inputs.parameters.s3-model-url}}
@@ -255,10 +202,6 @@ spec:
                       value: "true"
                     - name: S3_ENDPOINT
                       value: {{workflow.parameters.s3-endpoint}}
-                volumes:
-                - name: training-data
-                  hostPath:
-                    path: {{inputs.parameters.hostpath}}
                 restartPolicy: OnFailure
           - replicas: {{workflow.parameters.tf-ps}}
             tfReplicaType: PS
