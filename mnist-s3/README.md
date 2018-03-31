@@ -173,7 +173,7 @@ The argo workflow can be daunting, but basically our steps above extrapolate as 
 
 1. `get-workflow-info`: Generate and set variables for consumption in the rest of the pipeline.
 1. `tensorboard`: Tensorboard is spawned, configured to watch the S3 URL for the training output.
-1. `train-model`: A TFJob is spawned taking in variables such as number of workers, what path the datasets are at, which model container image, etc.
+1. `train-model`: A TFJob is spawned taking in variables such as number of workers, what path the datasets are at, which model container image, etc. The model is exported at the end.
 1. `serve-model`: Optionally, the model is served.
 
 With our workflow defined, we can now execute it.
