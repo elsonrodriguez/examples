@@ -39,8 +39,10 @@ stub = prediction_service_pb2.beta_create_PredictionService_stub(channel)
 request = predict_pb2.PredictRequest()
 request.model_spec.name = "mnist"
 request.model_spec.signature_name = "serving_default"
-request.inputs['x'].CopyFrom(
-    tf.contrib.util.make_tensor_proto(image, shape=[1, 28, 28]))
+#request.inputs['x'].CopyFrom(
+#    tf.contrib.util.make_tensor_proto(image, shape=[1, 28, 28]))
+request.inputs['inputs'].CopyFrom(
+    tf.contrib.util.make_tensor_proto(image, shape=(784,)))
 
 result = stub.Predict(request, 10.0)  # 10 secs timeout
 

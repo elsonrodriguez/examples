@@ -118,7 +118,9 @@ def cnn_serving_input_receiver_fn():
 
 
 def linear_serving_input_receiver_fn():
-  inputs = {X_FEATURE: tf.placeholder(tf.float32, (784,))}
+#  feature = tf.feature_column.make_parse_example_spec(feature_columns)
+#  inputs = {X_FEATURE: feature}
+  inputs = {X_FEATURE: tf.placeholder(tf.string, (784,))}
   return tf.estimator.export.ServingInputReceiver(inputs, inputs)
 
 
@@ -145,14 +147,28 @@ def main(unused_args): # pylint: disable=unused-argument
         tf.feature_column.numeric_column(
             X_FEATURE, shape=mnist.train.images.shape[1:])]
 
+    training_config = tf.estimator.RunConfig(
+        model_dir=TF_MODEL_DIR, save_summary_steps=100, save_checkpoints_steps=1000)
     classifier = tf.estimator.LinearClassifier(
         feature_columns=feature_columns, n_classes=N_DIGITS, model_dir=TF_MODEL_DIR)
-    classifier.train(input_fn=train_input_fn, steps=TF_TRAIN_STEPS)
-    scores = classifier.evaluate(input_fn=test_input_fn)
-    print('Accuracy (LinearClassifier): {0:f}'.format(scores['accuracy']))
-    # FIXME This doesn't seem to work. sticking to CNN for the example for now.
-    classifier.export_savedmodel(
-        TF_EXPORT_DIR, linear_serving_input_receiver_fn)
+    export_final = tf.estimator.FinalExporter(
+      TF_EXPORT_DIR, serving_input_receiver_fn=lambda: linear_serving_input_receiver_fn)
+    train_spec = tf.estimator.TrainSpec(
+        input_fn=train_input_fn, max_steps=TF_TRAIN_STEPS)
+    eval_spec = tf.estimator.EvalSpec(input_fn=test_input_fn,
+                                      steps=1,
+                                      exporters=export_final,
+                                      throttle_secs=1,
+                                      start_delay_secs=1)
+    tf.estimator.train_and_evaluate(classifier, train_spec, eval_spec)
+#
+#
+#    classifier.train(input_fn=train_input_fn, steps=TF_TRAIN_STEPS)
+#    scores = classifier.evaluate(input_fn=test_input_fn)
+#    print('Accuracy (LinearClassifier): {0:f}'.format(scores['accuracy']))
+#    # FIXME This doesn't seem to work. sticking to CNN for the example for now.
+#    classifier.export_savedmodel(
+#       TF_EXPORT_DIR, linear_serving_input_receiver_fn)
   elif TF_MODEL_TYPE == "CNN":
     # Convolutional network
     training_config = tf.estimator.RunConfig(
